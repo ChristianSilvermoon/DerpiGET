@@ -71,6 +71,7 @@ helpMsg() {
 	printf "  %-26s %s\n" "-m, --meta" "Save Meta Data to file"
 	printf "  %-26s %s\n" "-M, --meta-only" "Save Meta Data to file, don't download post"
 	printf "  %-26s %s\n" "-n, --no-save" "Don't save anything"
+	printf "  %-26s %s\n" "-q, --quiet" "Run silently and non-intractively"
 	printf "  %-26s %s\n" "-p, --print-meta" "Print Meta Data to stdout"
 	printf "  %-26s %s\n" "-s, --short-name" "Name files after their ID numbers"
 	exit
