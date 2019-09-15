@@ -153,21 +153,6 @@ parseArgs() {
 	targets=""
 	targetLimit=""
 
-	# Process piped input (if any) for links/IDs
-	if [ -p "/proc/self/fd/0" ]; then
-		read -d '' piped
-
-		for id in $piped; do
-			if [ "$(grep -E "^http(s|)://$domain/[0-9]" <<< "$id")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$id")" != "" ]; then
-				targets+="$(cut -d / -f 4 <<< "$id" | cut -d'?' -f 1) "
-			else
-				echo "Invalid Derpibooru Post link / Numerical ID: $id" | stderr
-				exit 1
-			fi
-		done
-	fi
-
-
 	for arg in "$@"; do
 		if [ "$ignore" -gt 0 ]; then
 			((ignore--))
@@ -231,21 +216,36 @@ parseArgs() {
 		fi
 
 	done
+
+	for id in $piped; do
+		if [ "$(grep -E "^http(s|)://$domain/[0-9]" <<< "$id")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$id")" != "" ]; then
+			targets+="$(cut -d / -f 4 <<< "$id" | cut -d'?' -f 1) "
+		else
+			echo "Invalid Derpibooru Post link / Numerical ID: $id" | stderr
+			exit 1
+		fi
+	done
 }
 
 getMeta() {
 	wget -qO- "$protocol://$domain/$1.json"
 }
 
+# Process piped input (if any) for links/IDs
+if [ -p "/proc/self/fd/0" ]; then
+	read -d '' piped
+fi
+
 checkDepends || exit 1 # Exit out if dependencies are unsatisfied
 parseArgs "$@" || exit 1 # Exit out if invalid args
-
 
 if [ "$mode" = "search" ]; then
 	searchDerpi "$squery"
 	exit
 fi
 
+
+#Download posts
 for id in $targets; do
 	log -ne "\e[1m[$id]\e[0m Downloading Meta Data... "
 	META="$(getMeta $id)"
