@@ -1,6 +1,9 @@
 #!/bin/bash
 version="19.9.14"
-script="$(dirname "$0")/$(basname "$0")"
+script="$(dirname "$0")/$(basename "$0")"
+domain="derpibooru.org"
+protocol="https"
+
 
 stderr() {
 	cat - 1>&2
@@ -67,13 +70,71 @@ helpMsg() {
 	echo -e "USAGE: derpiget [opt] <id|post link> \n"
 
 	printf "  %-26s %s\n" "-?, --help" "Display this message"
+	printf "  %-26s %s\n" "--domain=<domain>" "Set Target Domain"
+	printf "  %-26s %s\n" "-h, --http" "Don't use HTTPS"
 	printf "  %-26s %s\n" "--filter=<ID>" "Set Derpibooru filter ID"
 	printf "  %-26s %s\n" "-m, --meta" "Save Meta Data to file"
 	printf "  %-26s %s\n" "-M, --meta-only" "Save Meta Data to file, don't download post"
 	printf "  %-26s %s\n" "-n, --no-save" "Don't save anything"
 	printf "  %-26s %s\n" "-q, --quiet" "Run silently and non-intractively"
 	printf "  %-26s %s\n" "-p, --print-meta" "Print Meta Data to stdout"
+	printf "  %-26s %s\n" "--search=<query>" "Return list of matching post URLs"
 	printf "  %-26s %s\n" "-s, --short-name" "Name files after their ID numbers"
+	exit
+}
+
+searchDerpi() {
+	local query=$(echo "$1" |
+	sed 's/ /%20/g' |
+	sed 's/!/%21/g' |
+	sed 's/#/%23/g' |
+	sed 's/\$/%24/g' |
+	sed 's/&/%26/g' |
+	tr "'" '!' |
+	sed 's/!/%27/g' |
+	sed 's/(/%28/g' |
+	sed 's/)/%29/g' |
+	sed 's/*/%2A/g' |
+	sed 's/+/%2B/g' |
+	sed 's/,/%2C/g' |
+	sed 's/\//%2F/g' |
+	sed 's/:/%3A/g' |
+	sed 's/;/%3B/g' |
+	sed 's/=/%3D/g' |
+	sed 's/?/%3F/g' |
+	sed 's/@/%40/g' |
+	sed 's/\[/%5B/g' |
+	sed 's/\]/%5D/g')
+
+	page="1"
+	url="$protocol://$domain/search.json?q=$query&filter_id=$derpiFilter&perpage=50"
+	links=""
+	surl+="$url&page=$page"
+	cur="$(wget -qO- $surl)"
+
+	total="$(jq -r ".total" <<< "$cur")"
+
+	i=0
+	until [ "$postsLeft" = "false" ]; do
+		id=$(jq -r ".search[$i].id" <<< "$cur")
+
+		if [ "$id" = "null" ]; then
+			if [ "$i" -lt 50 ]; then
+				postsLeft="false"
+				break
+			fi
+			((page++))
+			i=0
+			surl+="$url&page=$page"
+			cur="$(wget -qO- $surl)"
+
+		else
+			links+="$protocol://$domain/$id "
+			((i++))
+		fi
+	done
+
+	echo "$links" | tr ' ' '\n'
 	exit
 }
 
@@ -97,7 +158,7 @@ parseArgs() {
 		read -d '' piped
 
 		for id in $piped; do
-			if [ "$(grep -E "^http(s|)://derpibooru.org/[0-9]" <<< "$id")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$id")" != "" ]; then
+			if [ "$(grep -E "^http(s|)://$domain/[0-9]" <<< "$id")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$id")" != "" ]; then
 				targets+="$(cut -d / -f 4 <<< "$id" | cut -d'?' -f 1) "
 			else
 				echo "Invalid Derpibooru Post link / Numerical ID: $id" | stderr
@@ -121,6 +182,13 @@ parseArgs() {
 				"--print-meta"|"-p")
 					opt_printMeta="true"
 					;;
+
+				"--http"|"-h")
+					protocol="http"
+					;;
+				"--domain="*)
+					domain="$(cut -d'=' -f 2- <<< "$arg")"
+					;;
 				"--no-save"|"-n")
 					opt_savePost="false"
 					opt_saveMeta="false"
@@ -134,6 +202,10 @@ parseArgs() {
 					;;
 				"--short-name"|"-s")
 					opt_shortName="true"
+					;;
+				"--search="*)
+					squery="$(cut -d'=' -f 2- <<< "$arg")"
+					mode="search"
 					;;
 				"--filter="*)
 					setDerpiFilter "$(cut -d'=' -f 2- <<< "$arg")"
@@ -154,7 +226,7 @@ parseArgs() {
 		fi
 
 		#Get Target IDs
-		if [ "$noTarget" = "false" ] && [ "$(grep -E "^http(s|)://derpibooru.org/[0-9]" <<< "$arg")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$arg")" != "" ]; then
+		if [ "$noTarget" = "false" ] && [ "$(grep -E "^http(s|)://$domain/[0-9]" <<< "$arg")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$arg")" != "" ]; then
 			targets+="$(cut -d / -f 4 <<< "$arg" | cut -d'?' -f 1) "
 		fi
 
@@ -162,11 +234,17 @@ parseArgs() {
 }
 
 getMeta() {
-	wget -qO- "https://derpibooru.org/$1.json"
+	wget -qO- "$protocol://$domain/$1.json"
 }
 
 checkDepends || exit 1 # Exit out if dependencies are unsatisfied
 parseArgs "$@" || exit 1 # Exit out if invalid args
+
+
+if [ "$mode" = "search" ]; then
+	searchDerpi "$squery"
+	exit
+fi
 
 for id in $targets; do
 	log -ne "\e[1m[$id]\e[0m Downloading Meta Data... "
@@ -191,7 +269,8 @@ for id in $targets; do
 
 	if [ "$opt_savePost" = "true" ]; then
 		log -ne "\e[1m[$id]\e[0m Downloading Post... "
-		wget -q "https:$(jq -r ".image" <<< "$META")" -O "$NAME"
+		echo "$protocol:$(jq -r ".image" <<< "$META")"
+		wget -q "$protocol:$(jq -r ".image" <<< "$META")" -O "$NAME"
 		log "Done"
 	fi
 
