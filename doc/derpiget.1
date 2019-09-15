@@ -1,0 +1,99 @@
+.TH DERPIGET 1
+
+.SH NAME
+derpiGET \- Tool of Mass Equine Acquisition
+.SH SYNOPSIS
+.na
+.hy 0
+.B derpiget
+[opt] [ID|URL]
+.SH DESCRIPTION
+.PP
+.B derpiget
+is a tool designed for downloading posts and their respective meta data from
+.I Booru-on-rails
+Image Boards, primarily
+.I Derpibooru
+an image board created and run by fans of the My Little Pony franchise
+.PP
+It may function with other
+.I Booru-on-rails
+image boards, but compatabillity is not garaunteed and is not a priority.
+
+.SH OPTIONS
+.TP
+.BR \-? ", " --help
+Display Help Message
+
+.TP
+.BR \-\-domain=<url>
+Change the target domain
+
+The target domain is normally:
+.I derpibooru.org
+
+You might, for example try:
+.B derpiget --domain=trixiebooru.org
+
+.TP
+.BR \-\-filter=<ID>
+Sets content filter, used by the Search Option. Possible values are any Numerical ID
+or any Numerical ID.
+
+Alternatively you can use:
+.B default, legacy, everything, dark,
+or
+.B r34
+which correspond to filters listed on:
+.I https://derpibooru.org/filters
+
+.TP
+.BR \-h ", " \-\-http
+Don't use
+.B HTTPS
+
+.TP
+.BR \-m ", " \-\-meta
+Save Meta Data in addition to requested files in corresponding JSON files
+
+.TP
+.BR \-M ", " \-\-meta\-only
+Save
+.I ONLY
+the Meta Data of the requested files in corresponding JSON files
+
+.TP
+.BR \-n ", " \-\-no\-save
+Don't save any files at all
+
+.TP
+.BR \-q ", " \-\-quiet
+Run silently and non-intractively.
+
+In circumstances the user would be ordinarily be prompted, the script will
+assume that the answer is
+.I yes
+automatically.
+
+.TP
+.BR \-p ", " \-\-print\-meta
+Print the file's meta data to stdout.
+
+This is the
+.I jq
+formatted output of the
+.I Booru-on-rails
+JSON API
+
+.TP
+.BR \-\-search=<Query>
+Get a list of search results from the image board.
+
+The search syntax is documented here:
+.I https://derpibooru.org/search/syntax
+
+.TP
+.BR \-s ", " \-\-short\-name
+Shorten files to their ID and extension only.
+
+Normally, whatever the server named the file would be preserved.
