@@ -8,7 +8,7 @@ stderr() {
 
 checkDepends() {
 
-	local depends='jq'
+	local depends='wget jq'
 	local missing=""
 
 	for dep in $depends; do
