@@ -1,6 +1,5 @@
 #!/bin/bash
 version="19.9.16"
-script="$(dirname "$0")/$(basename "$0")"
 
 stderr() {
 	cat - 1>&2
@@ -116,13 +115,13 @@ loadConf() {
 
 log() {
 	if [ "$opt_quiet" != "true" ]; then
-		echo $@
+		echo "$@"
 	fi
 }
 
 helpMsg() {
 	echo -e "DerpiGET, version: $version"
-	echo -e "USAGE: derpiget [opt] <id|post link> \n"
+	echo -e "USAGE: $(basename "$0") [opt] <id|post link> \n"
 
 	printf "  %-26s %s\n" "-?, --help" "Display this message"
 	printf "  %-26s %s\n" "-c, --config" "Print Configuration to stdout"
@@ -142,7 +141,8 @@ helpMsg() {
 }
 
 searchDerpi() {
-	local query=$(echo "$1" |
+	local query
+	query=$(echo "$1" |
 	sed 's/ /%20/g' |
 	sed 's/!/%21/g' |
 	sed 's/#/%23/g' |
@@ -168,9 +168,7 @@ searchDerpi() {
 	url="$protocol://$domain/search.json?q=$query&filter_id=$derpiFilter&perpage=50"
 	links=""
 	surl+="$url&page=$page"
-	cur="$(wget -qO- $surl)"
-
-	total="$(jq -r ".total" <<< "$cur")"
+	cur="$(wget -qO- "$surl")"
 
 	i=0
 	until [ "$postsLeft" = "false" ]; do
@@ -184,7 +182,7 @@ searchDerpi() {
 			((page++))
 			i=0
 			surl+="$url&page=$page"
-			cur="$(wget -qO- $surl)"
+			cur="$(wget -qO- "$surl")"
 
 		else
 			links+="$protocol://$domain/$id "
@@ -209,7 +207,6 @@ parseArgs() {
 	opt_saveMeta="false"
 	opt_quiet="false"
 	targets=""
-	targetLimit=""
 
 	for arg in "$@"; do
 		if [ "$ignore" -gt 0 ]; then
@@ -298,7 +295,7 @@ parseArgs() {
 		if [ "$(grep -E "^http(s|)://$domain/[0-9]" <<< "$id")" != "" ] || [ "$(grep -E "^[0-9]+$" <<< "$id")" != "" ]; then
 			targets+="$(cut -d / -f 4 <<< "$id" | cut -d'?' -f 1) "
 		else
-			echo "Invalid Derpibooru Post link / Numerical ID: $id" | stderr
+			echo "Invalid Post link / Numerical ID: $id" | stderr
 			exit 1
 		fi
 	done
@@ -310,7 +307,7 @@ getMeta() {
 
 # Process piped input (if any) for links/IDs
 if [ -p "/proc/self/fd/0" ]; then
-	read -d '' piped
+	read -rd '' piped
 fi
 
 setDerpiFilter "default"
@@ -327,7 +324,7 @@ fi
 #Download posts
 for id in $targets; do
 	log -ne "\e[1m[$id]\e[0m Downloading Meta Data... "
-	META="$(getMeta $id)"
+	META="$(getMeta "$id")"
 	log "Done"
 
 	if [ "$opt_shortName" != "true" ]; then
