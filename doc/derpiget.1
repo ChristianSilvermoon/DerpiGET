@@ -26,6 +26,20 @@ image boards, but compatabillity is not garaunteed and is not a priority.
 Display Help Message
 
 .TP
+.BR \-c ", " --config
+Print configuration to stdout
+
+Note: This will cause the script to exit.
+
+.TP
+.BR \-\-config=<file>
+User an alternative config file
+
+if
+.I <FILE>
+is left empty, then no file is used and the default configuration is used instead
+
+.TP
 .BR \-\-domain=<url>
 Change the target domain
 
@@ -50,6 +64,11 @@ which correspond to filters listed on:
 .TP
 .BR \-h ", " \-\-http
 Don't use
+.B HTTPS
+
+.TP
+.BR \-H ", " \-\-https
+DO use
 .B HTTPS
 
 .TP
@@ -97,3 +116,31 @@ The search syntax is documented here:
 Shorten files to their ID and extension only.
 
 Normally, whatever the server named the file would be preserved.
+
+.SH CONFIGURATION
+Configuration files can be used to change how
+.B derpiget
+behaves. The file is sought for in a varity of locations on the system
+and the first configuration file located is used.
+.PP
+Locations are prioritized in this order:
+
+.I $HOME/.derpigetrc
+
+.I $XDG_CONFIG_HOME/derpiget.conf
+
+.I $XDG_DATA_HOME/derpiget/derpiget.conf
+
+.I /etc/derpiget.conf
+
+If XDG variables are unset, their values are defaulted to standards defined here:
+
+.I https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+
+.TP
+.BR "Exmaple Config:"
+protocol=https
+
+domain=derpibooru.org
+
+filter=default

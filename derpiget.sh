@@ -1,9 +1,6 @@
 #!/bin/bash
-version="19.9.14"
+version="19.9.16"
 script="$(dirname "$0")/$(basename "$0")"
-domain="derpibooru.org"
-protocol="https"
-
 
 stderr() {
 	cat - 1>&2
@@ -59,6 +56,64 @@ setDerpiFilter() {
 		esac
 }
 
+defaultConf() {
+	# Initialize XDG Vars if unset
+	[ "$XDG_DATA_HOME" = "" ] && XDG_DATA_HOME="$HOME/.local/share"
+	[ "$XDG_CONFIG_HOME" = "" ] && XDG_CONFIG_HOME="$HOME/.config"
+
+	# Load config
+	unset CONF
+	unset CONF_DATA
+	protocol="https"
+	domain="derpibooru.org"
+	setDerpiFilter "default"
+}
+
+
+loadConf() {
+	# Initialize XDG Vars if unset
+	[ "$XDG_DATA_HOME" = "" ] && XDG_DATA_HOME="$HOME/.local/share"
+	[ "$XDG_CONFIG_HOME" = "" ] && XDG_CONFIG_HOME="$HOME/.config"
+
+	# Load config
+	if [ "$1" != "" ]&&[ -e "$1" ]; then
+		CONF="$1"
+	elif [ -e "$HOME/.derpigetrc" ]; then
+		CONF="$HOME/.derpigetrc"
+	elif [ -e "$XDG_CONFIG_HOME/derpiget.conf" ]; then
+		CONF="$XDG_CONFIG_HOME/derpiget.conf"
+	elif [ -e "$XDG_DATA_HOME/derpiget/derpiget.conf" ]; then
+		CONF="$XDG_DATA_HOME/derpiget/derpiget.conf"
+	elif [ -e "/etc/derpiget.conf" ]; then
+		CONF="/etc/derpiget.conf"
+	fi
+
+	# Actually DO the loading
+	if [ "$CONF" != "" ]; then
+		CONF_DATA="$(cat "$CONF")"
+
+		# HTTP or HTTPS
+		if [ "$(grep "^protocol" <<< "$CONF_DATA" | cut -d = -f 2)" != "" ]; then
+			protocol="$(grep "^protocol" <<< "$CONF_DATA" | cut -d = -f 2)"
+
+			if [ "$protocol" != "http" ]&&[ "$protocol" != "https" ]; then
+				echo "Invalid Protocol: $protocol" | stderr
+				exit 1
+			fi
+		fi
+
+		# Target Domain
+		if [ "$(grep "^domain" <<< "$CONF_DATA" | cut -d = -f 2)" != "" ]; then
+			domain="$(grep "^domain" <<< "$CONF_DATA" | cut -d = -f 2)"
+		fi
+
+		# Filter ID
+		if [ "$(grep "^filter" <<< "$CONF_DATA" | cut -d = -f 2)" != "" ]; then
+			setDerpiFilter "$(grep "^filter" <<< "$CONF_DATA" | cut -d = -f 2)"
+		fi
+	fi
+}
+
 log() {
 	if [ "$opt_quiet" != "true" ]; then
 		echo $@
@@ -70,8 +125,11 @@ helpMsg() {
 	echo -e "USAGE: derpiget [opt] <id|post link> \n"
 
 	printf "  %-26s %s\n" "-?, --help" "Display this message"
+	printf "  %-26s %s\n" "-c, --config" "Print Configuration to stdout"
+	printf "  %-26s %s\n" "--config=<file>" "Use a config file; empty forces default config"
 	printf "  %-26s %s\n" "--domain=<domain>" "Set Target Domain"
 	printf "  %-26s %s\n" "-h, --http" "Don't use HTTPS"
+	printf "  %-26s %s\n" "-H, --https" "Use HTTPS"
 	printf "  %-26s %s\n" "--filter=<ID>" "Set Derpibooru filter ID"
 	printf "  %-26s %s\n" "-m, --meta" "Save Meta Data to file"
 	printf "  %-26s %s\n" "-M, --meta-only" "Save Meta Data to file, don't download post"
@@ -161,13 +219,32 @@ parseArgs() {
 
 		if [ "$noOpt" = "false" ]&&[ "$(grep "^-" <<< "$arg")" != "" ]; then
 			case $arg in
+				"--config"|"-c")
+					echo -e "Derpiget Configuration\n"
+					echo "Config File: $CONF"
+					echo "Protocol: $protocol"
+					echo "Domain: $domain"
+					echo "Filter: $derpiFilter"
+					exit
+					;;
+				"--config="*)
+					local opt
+					opt="$(cut -d'=' -f 2- <<< "$arg")"
+					if [ "$opt" = "" ]; then
+						defaultConf
+					else
+						loadConf "$opt"
+					fi
+					;;
 				"--quiet"|"-q")
 					opt_quiet="true"
 					;;
 				"--print-meta"|"-p")
 					opt_printMeta="true"
 					;;
-
+				"--https"|"-H")
+					protocol="https"
+					;;
 				"--http"|"-h")
 					protocol="http"
 					;;
@@ -236,6 +313,9 @@ if [ -p "/proc/self/fd/0" ]; then
 	read -d '' piped
 fi
 
+setDerpiFilter "default"
+defaultConf # Set Default Config
+loadConf # Load Config File if available
 checkDepends || exit 1 # Exit out if dependencies are unsatisfied
 parseArgs "$@" || exit 1 # Exit out if invalid args
 
@@ -243,7 +323,6 @@ if [ "$mode" = "search" ]; then
 	searchDerpi "$squery"
 	exit
 fi
-
 
 #Download posts
 for id in $targets; do
